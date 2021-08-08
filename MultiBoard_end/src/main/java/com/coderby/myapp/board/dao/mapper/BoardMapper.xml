@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.coderby.myapp.board.dao.IBoardRepository">
+
+	<select id="selectArticleListByCategory" parameterType="map" resultType="com.coderby.myapp.board.model.Board">
+	<![CDATA[
+		SELECT 
+			BOARD_ID 				AS "boardId", 
+			CATEGORY_ID 			AS "categoryId", 
+			WRITER					AS "writer", 
+			EMAIL					AS "email", 
+			TITLE					AS "title", 
+			WRITE_DATE				AS "writeDate", 
+			MASTER_ID 				AS "masterId", 
+			REPLY_NUMBER 			AS "replyNumber", 
+			REPLY_STEP				AS "replyStep", 
+			READ_COUNT				AS "readCount", 
+			RNUM+1 					AS "seq"
+	    FROM (
+	    	SELECT 
+	    		BOARD_ID, 
+	    		CATEGORY_ID, 
+	    		WRITER, 
+	    		EMAIL, 
+	    		TITLE, 
+	    		WRITE_DATE, 
+	    		MASTER_ID, 
+	    		REPLY_NUMBER, 
+	    		REPLY_STEP, 
+	    		READ_COUNT, 
+	    		ROWNUM AS RNUM
+	    	FROM (
+	    		SELECT * FROM BOARD
+	    		WHERE CATEGORY_ID=#{categoryId}
+	    		ORDER BY MASTER_ID DESC, REPLY_NUMBER, REPLY_STEP
+	    	)
+	    )
+	    WHERE RNUM BETWEEN #{start} AND #{end}
+	]]>
+	</select>
+	
+	<select id="selectArticle" parameterType="int" resultType="com.coderby.myapp.board.model.Board">
+	<![CDATA[
+		SELECT 
+			BOARD.BOARD_ID				AS "boardId", 
+			CATEGORY_ID					AS "categoryId", 
+			WRITER						AS "writer", 
+			EMAIL						AS "email", 
+			TITLE						AS "title", 
+			CONTENT						AS "content", 
+			READ_COUNT					AS "readCount", 
+			WRITE_DATE					AS "writeDate", 
+			MASTER_ID					AS "masterId", 
+			REPLY_NUMBER				AS "replyNumber", 
+			REPLY_STEP					AS "replyStep", 
+			BOARD_UPLOAD_FILE.FILE_ID			AS "fileId", 
+			BOARD_UPLOAD_FILE.FILE_NAME			AS "fileName", 
+			BOARD_UPLOAD_FILE.FILE_SIZE			AS "fileSize",
+			BOARD_UPLOAD_FILE.FILE_CONTENT_TYPE	AS "fileContentType"
+		FROM BOARD LEFT OUTER JOIN BOARD_UPLOAD_FILE 
+			ON BOARD.BOARD_ID=BOARD_UPLOAD_FILE.BOARD_ID 
+		WHERE BOARD.BOARD_ID=#{boardId}
+	]]>
+	</select>
+	
+	<update id="updateReadCount" parameterType="int">
+	<![CDATA[
+		UPDATE BOARD 
+			SET READ_COUNT = READ_COUNT+1 
+		WHERE BOARD_ID=#{boardId}
+	]]>
+	</update>
+	
+	<select id="selectMaxArticleNo" parameterType="int" resultType="int">
+	<![CDATA[
+		SELECT 
+			NVL(MAX(BOARD_ID),0) AS "articleNo"
+		FROM BOARD
+	]]>
+	</select>
+
+	<select id="selectMaxFileId" parameterType="int" resultType="int">
+	<![CDATA[
+		SELECT 
+			NVL(MAX(FILE_ID),0) AS "fileId"
+		FROM BOARD_UPLOAD_FILE
+	]]>
+	</select>
+		
+	<insert id="insertArticle" parameterType="com.coderby.myapp.board.model.Board">
+	<![CDATA[
+		INSERT INTO 
+		BOARD 
+			(BOARD_ID, CATEGORY_ID, WRITER, EMAIL, PASSWORD, TITLE, CONTENT, WRITE_DATE, MASTER_ID, REPLY_NUMBER, REPLY_STEP)  
+		VALUES 
+			(#{boardId}, #{categoryId}, #{writer}, #{email}, #{password}, #{title}, #{content}, SYSDATE, #{boardId}, 0, 0)
+	]]>
+	</insert>
+	
+	<insert id="insertFileData" parameterType="com.coderby.myapp.board.model.BoardUploadFile">
+	<![CDATA[
+		INSERT INTO 
+		BOARD_UPLOAD_FILE 
+			(FILE_ID, BOARD_ID, FILE_NAME, FILE_SIZE, FILE_CONTENT_TYPE, FILE_DATA) 
+		VALUES 
+			(#{fileId}, #{boardId}, #{fileName}, #{fileSize}, #{fileContentType}, #{fileData})
+	]]>
+	</insert>
+	
+	<select id="getFile" parameterType="int" resultType="com.coderby.myapp.board.model.BoardUploadFile">
+	<![CDATA[
+		SELECT 
+			FILE_ID				AS "fileId", 
+			BOARD_ID			AS "boardId", 
+			FILE_NAME			AS "fileName", 
+			FILE_SIZE			AS "fileSize", 
+			FILE_CONTENT_TYPE	AS "fileContentType", 
+			FILE_DATA 			AS "fileData"
+		FROM BOARD_UPLOAD_FILE 
+		WHERE FILE_ID=#{fileId}
+	]]>
+	</select>
+
+	<insert id="updateReplyNumber" parameterType="map">
+	<![CDATA[
+		UPDATE 
+			BOARD 
+		SET 
+			REPLY_NUMBER = REPLY_NUMBER + 1 
+		WHERE 
+			MASTER_ID = #{masterId} AND REPLY_NUMBER > #{replyNumber}
+	]]>
+	</insert>
+
+	<insert id="replyArticle" parameterType="com.coderby.myapp.board.model.Board">
+	<![CDATA[
+		INSERT INTO 
+		BOARD 
+			(BOARD_ID, CATEGORY_ID, WRITER, EMAIL, PASSWORD, TITLE, CONTENT, WRITE_DATE, MASTER_ID, REPLY_NUMBER, REPLY_STEP)  
+		VALUES 
+			(#{boardId}, #{categoryId}, #{writer}, #{email}, #{password}, #{title}, #{content}, SYSDATE, #{masterId}, #{replyNumber}, #{replyStep})
+	]]>
+	</insert>
+		
+	<select id="getPassword" parameterType="int" resultType="string">
+	<![CDATA[
+		SELECT PASSWORD 
+		FROM BOARD 
+		WHERE BOARD_ID=#{boardId}
+	]]>
+	</select>
+	
+	<update id="updateArticle" parameterType="com.coderby.myapp.board.model.Board">
+	<![CDATA[
+		UPDATE 
+			BOARD 
+		SET 
+			CATEGORY_ID=#{categoryId}, WRITER=#{writer}, EMAIL=#{email}, TITLE=#{title}, 
+			CONTENT=#{content}, WRITE_DATE=SYSDATE 
+		WHERE 
+			BOARD_ID=#{boardId}
+	]]>
+	</update>
+
+	<update id="updateFileData" parameterType="com.coderby.myapp.board.model.BoardUploadFile">
+	<![CDATA[
+	 	UPDATE 
+	 		BOARD_UPLOAD_FILE 
+	 	SET 
+	 		FILE_NAME=#{fileName}, FILE_SIZE=#{fileSize}, FILE_CONTENT_TYPE=#{fileContentType}, FILE_DATA=#{fileData} 
+	 	WHERE 
+	 		FILE_ID=#{fileId}
+	]]>
+	</update>
+	
+	<select id="selectDeleteArticle" parameterType="int" resultType="com.coderby.myapp.board.model.Board">
+	<![CDATA[
+		SELECT 
+			CATEGORY_ID		AS "categoryId", 
+			MASTER_ID		AS "masterId", 
+			REPLY_NUMBER	AS "replyNumber"
+		FROM
+			BOARD
+		WHERE 
+			BOARD_ID = #{boardId}
+	]]>
+	</select>
+	
+	<delete id="deleteFileData" parameterType="int">
+	<![CDATA[
+		DELETE FROM BOARD_UPLOAD_FILE 
+		WHERE EXISTS  ( SELECT BOARD_ID FROM BOARD 
+						WHERE BOARD.MASTER_ID=#{boardId} AND BOARD.BOARD_ID = BOARD_UPLOAD_FILE.BOARD_ID )
+	]]>
+	</delete>
+
+	<delete id="deleteReplyFileData" parameterType="int">
+	<![CDATA[
+		DELETE FROM BOARD_UPLOAD_FILE 
+		WHERE EXISTS  ( SELECT BOARD_ID FROM BOARD 
+						WHERE BOARD.BOARD_ID=#{boardId} AND BOARD.BOARD_ID = BOARD_UPLOAD_FILE.BOARD_ID )
+	]]>
+	</delete>
+
+	<delete id="deleteArticleByBoardId" parameterType="map">
+		DELETE FROM 
+			BOARD 
+		WHERE 
+			BOARD_ID=#{boardId}
+	</delete>
+
+	<delete id="deleteArticleByMasterId" parameterType="map">
+		DELETE FROM 
+			BOARD 
+		WHERE 
+			MASTER_ID=#{boardId}
+	</delete>
+	
+	<select id="selectTotalArticleCount" resultType="int">
+	<![CDATA[
+		SELECT COUNT(BOARD_ID) AS "count" 
+		FROM BOARD
+	]]>
+	</select>
+	
+	<select id="selectTotalArticleCountByCategoryId" parameterType="int" resultType="int">
+	<![CDATA[
+		SELECT COUNT(BOARD_ID) AS "count"
+		FROM BOARD 
+		WHERE CATEGORY_ID=#{categoryId}	
+	]]>
+	</select>
+	
+	<select id="selectTotalArticleCountByKeyword" parameterType="string" resultType="int">
+	<![CDATA[
+		SELECT 
+			COUNT(*) FROM BOARD
+		WHERE 
+			TITLE LIKE #{keyword} OR CONTENT LIKE #{keyword}
+	]]>
+	</select> 
+
+	<select id="searchListByContentKeyword" parameterType="hashmap" resultType="com.coderby.myapp.board.model.Board">
+	<![CDATA[
+		SELECT 
+			BOARD_ID 				AS "boardId", 
+			CATEGORY_ID 			AS "categoryId", 
+			WRITER					AS "writer", 
+			EMAIL					AS "email", 
+			TITLE					AS "title", 
+			WRITE_DATE				AS "writeDate", 
+			MASTER_ID 				AS "masterId", 
+			REPLY_NUMBER 			AS "replyNumber", 
+			REPLY_STEP				AS "replyStep", 
+			READ_COUNT				AS "readCount", 
+			RNUM+1 					AS "seq"
+	    FROM (
+	    	SELECT 
+	    		BOARD_ID, 
+	    		CATEGORY_ID, 
+	    		WRITER, 
+	    		EMAIL, 
+	    		TITLE, 
+	    		WRITE_DATE, 
+	    		MASTER_ID, 
+	    		REPLY_NUMBER, 
+	    		REPLY_STEP, 
+	    		READ_COUNT, 
+	    		ROWNUM AS RNUM
+	    	FROM (
+	    		SELECT * FROM BOARD
+	    		WHERE
+	    			TITLE LIKE #{keyword}
+		    		OR 
+		    		CONTENT LIKE #{keyword}
+	    		ORDER BY MASTER_ID DESC, REPLY_NUMBER, REPLY_STEP
+	    	)
+	    )
+	    WHERE RNUM BETWEEN #{start} AND #{end}
+	]]>
+	</select>
+
+</mapper>
+
